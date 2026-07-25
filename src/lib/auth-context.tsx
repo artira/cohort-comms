@@ -9,6 +9,7 @@ type Profile = {
   email: string;
   display_name: string | null;
   avatar_color: string;
+  is_admin: boolean;
   status: string;
   last_seen_at: string;
 };

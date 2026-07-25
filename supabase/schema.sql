@@ -9,6 +9,7 @@ create table if not exists public.profiles (
   email text not null,
   display_name text,
   avatar_color text default '#6c5ce7',
+  is_admin boolean default false,
   status text default 'offline' check (status in ('online', 'away', 'offline')),
   last_seen_at timestamptz default now(),
   created_at timestamptz default now()
@@ -23,6 +24,7 @@ create table if not exists public.channels (
   emoji text default '💬',
   created_by uuid references public.profiles(id) on delete set null,
   is_default boolean default false,
+  archived boolean default false,
   created_at timestamptz default now()
 );
 
@@ -48,6 +50,16 @@ create table if not exists public.reactions (
   unique (message_id, user_id, emoji)
 );
 
+-- Direct messages
+create table if not exists public.direct_messages (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid not null references public.profiles(id) on delete cascade,
+  recipient_id uuid not null references public.profiles(id) on delete cascade,
+  body text not null,
+  read boolean default false,
+  created_at timestamptz default now()
+);
+
 -- Channel members (tracks read state)
 create table if not exists public.channel_members (
   channel_id uuid not null references public.channels(id) on delete cascade,
@@ -57,7 +69,7 @@ create table if not exists public.channel_members (
   primary key (channel_id, user_id)
 );
 
--- Typing indicators (ephemeral — cleaned by app)
+-- Typing indicators (ephemeral)
 create table if not exists public.typing_indicators (
   channel_id uuid not null references public.channels(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -70,38 +82,60 @@ alter table public.profiles enable row level security;
 alter table public.channels enable row level security;
 alter table public.messages enable row level security;
 alter table public.reactions enable row level security;
+alter table public.direct_messages enable row level security;
 alter table public.channel_members enable row level security;
 alter table public.typing_indicators enable row level security;
 
--- Profiles
-create policy "profiles_read" on public.profiles for select using (true);
+-- Profiles: authenticated users only
+create policy "profiles_read" on public.profiles for select to authenticated using (true);
 create policy "profiles_insert" on public.profiles for insert with check (auth.uid() = id);
 create policy "profiles_update" on public.profiles for update using (auth.uid() = id);
 
--- Channels: everyone reads, authenticated can create
-create policy "channels_read" on public.channels for select using (true);
+-- Channels: authenticated reads, creator can update/delete
+create policy "channels_read" on public.channels for select to authenticated using (true);
 create policy "channels_insert" on public.channels for insert with check (auth.uid() is not null);
 create policy "channels_update" on public.channels for update using (auth.uid() = created_by);
 create policy "channels_delete" on public.channels for delete using (auth.uid() = created_by);
 
--- Messages: everyone reads, authenticated can insert own
-create policy "messages_read" on public.messages for select using (true);
-create policy "messages_insert" on public.messages for insert with check (auth.uid() = author_id);
+-- Messages: authenticated reads; announcement channels require is_admin
+create policy "messages_read" on public.messages for select to authenticated using (true);
+create policy "messages_insert" on public.messages for insert with check (
+  auth.uid() = author_id
+  and (
+    -- Non-announcement channels: any authenticated user
+    not exists (
+      select 1 from public.channels where id = channel_id and type = 'announcement'
+    )
+    or
+    -- Announcement channels: admin only
+    exists (
+      select 1 from public.profiles where id = auth.uid() and is_admin = true
+    )
+  )
+);
 create policy "messages_update" on public.messages for update using (auth.uid() = author_id);
 create policy "messages_delete" on public.messages for delete using (auth.uid() = author_id);
 
--- Reactions
-create policy "reactions_read" on public.reactions for select using (true);
+-- Reactions: authenticated only
+create policy "reactions_read" on public.reactions for select to authenticated using (true);
 create policy "reactions_insert" on public.reactions for insert with check (auth.uid() = user_id);
 create policy "reactions_delete" on public.reactions for delete using (auth.uid() = user_id);
 
--- Channel members
-create policy "channel_members_read" on public.channel_members for select using (true);
+-- Direct messages: sender and recipient only
+create policy "dm_read" on public.direct_messages for select to authenticated using (
+  auth.uid() = sender_id or auth.uid() = recipient_id
+);
+create policy "dm_insert" on public.direct_messages for insert with check (auth.uid() = sender_id);
+create policy "dm_update" on public.direct_messages for update using (auth.uid() = recipient_id);
+create policy "dm_delete" on public.direct_messages for delete using (auth.uid() = sender_id);
+
+-- Channel members: authenticated only
+create policy "channel_members_read" on public.channel_members for select to authenticated using (true);
 create policy "channel_members_insert" on public.channel_members for insert with check (auth.uid() = user_id);
 create policy "channel_members_update" on public.channel_members for update using (auth.uid() = user_id);
 
--- Typing indicators
-create policy "typing_read" on public.typing_indicators for select using (true);
+-- Typing indicators: authenticated only
+create policy "typing_read" on public.typing_indicators for select to authenticated using (true);
 create policy "typing_insert" on public.typing_indicators for insert with check (auth.uid() = user_id);
 create policy "typing_delete" on public.typing_indicators for delete using (auth.uid() = user_id);
 
@@ -140,7 +174,8 @@ insert into public.channels (name, description, type, emoji, is_default) values
   ('ideas', 'Brainstorm and discuss', 'thread-board', '💡', true)
 on conflict do nothing;
 
--- Enable Realtime on messages and typing
+-- Enable Realtime
 alter publication supabase_realtime add table public.messages;
 alter publication supabase_realtime add table public.typing_indicators;
 alter publication supabase_realtime add table public.profiles;
+alter publication supabase_realtime add table public.direct_messages;
