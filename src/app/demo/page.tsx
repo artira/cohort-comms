@@ -300,29 +300,34 @@ export default function DemoPage() {
       {currentTour && <TourTooltip step={currentTour} stepNum={tourStep} total={TOUR_STEPS.length} onNext={nextStep} onPrev={prevStep} onEnd={endTour} />}
 
       {/* Demo banner */}
-      <div className="fixed top-0 left-0 right-0 z-[70] text-center py-1.5 text-xs font-semibold text-white flex items-center justify-center gap-2"
+      <div className="fixed top-0 left-0 right-0 z-[70] text-center text-xs font-semibold text-white flex flex-col"
         style={{ background: 'var(--gradient-1)' }}>
-        <span>🎮 Interactive Demo</span>
-        {!tourVisible && !showTourPrompt && (
-          <button onClick={startTour} className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 hover:bg-white/30 transition-colors">
-            🎓 Restart tour
+        <div className="py-1.5 flex items-center justify-center gap-2">
+          <span>🎮 Interactive Demo</span>
+          {!tourVisible && !showTourPrompt && (
+            <button onClick={startTour} className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 hover:bg-white/30 transition-colors">
+              🎓 Restart tour
+            </button>
+          )}
+          <button onClick={() => router.push('/auth')}
+            className="px-3 py-0.5 rounded-full text-[10px] font-bold bg-white/20 hover:bg-white/30 transition-colors">
+            Sign up for real →
           </button>
-        )}
-        <button onClick={() => router.push('/auth')}
-          className="px-3 py-0.5 rounded-full text-[10px] font-bold bg-white/20 hover:bg-white/30 transition-colors">
-          Sign up for real →
-        </button>
+        </div>
+        <div className="py-1 text-[11px] font-normal opacity-90" style={{ background: 'rgba(0,0,0,0.15)' }}>
+          Built for cohorts: announcements, peer help, demos, and accountability — all in one place.
+        </div>
       </div>
 
       {/* Mobile sidebar toggle */}
       <button onClick={() => setShowMobileSidebar(!showMobileSidebar)}
-        className="md:hidden fixed top-10 left-3 z-50 p-2 rounded-xl" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
+        className="md:hidden fixed top-16 left-3 z-50 p-2 rounded-xl" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
 
       {/* Sidebar */}
       <div id="tour-sidebar"
-        className={`${showMobileSidebar ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed md:relative z-[85] w-64 h-full flex flex-col border-r transition-transform pt-8 ${currentTour?.highlight === 'sidebar' || currentTour?.highlight === 'channels' ? 'ring-2 ring-purple-400 rounded-r-xl' : ''}`}
+        className={`${showMobileSidebar ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed md:relative z-[85] w-64 h-full flex flex-col border-r transition-transform pt-14 ${currentTour?.highlight === 'sidebar' || currentTour?.highlight === 'channels' ? 'ring-2 ring-purple-400 rounded-r-xl' : ''}`}
         style={{ background: 'var(--bg-sidebar)', borderColor: 'var(--border)' }}>
         <div className="p-4 border-b" style={{ borderColor: 'var(--border)' }}>
           <h1 className="text-base font-bold flex items-center gap-2">
@@ -373,23 +378,42 @@ export default function DemoPage() {
       </div>
 
       {/* Main chat */}
-      <div className="flex-1 flex flex-col min-w-0 pt-8">
+      <div className="flex-1 flex flex-col min-w-0 pt-14">
         {/* Channel header */}
-        <div className="h-14 px-4 flex items-center justify-between border-b flex-shrink-0"
+        <div className="px-4 flex flex-col border-b flex-shrink-0"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="flex items-center gap-2 pl-10 md:pl-0">
-            <span className="text-lg">{channel.emoji}</span>
-            <h2 className="text-sm font-semibold">{channel.name}</h2>
-            <span className="text-xs hidden sm:inline" style={{ color: 'var(--text-muted)' }}>— {channel.description}</span>
+          {/* Top row: channel name + actions */}
+          <div className="h-12 flex items-center justify-between">
+            <div className="flex items-center gap-2 pl-10 md:pl-0">
+              <span className="text-lg">{channel.emoji}</span>
+              <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{channel.name}</h2>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}>
+                {channel.type === 'chat' ? 'Chat' : channel.type === 'announcement' ? 'Announcement' : 'Thread Board'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button className="p-1.5 rounded-lg hover:opacity-80 hidden sm:flex items-center gap-1 text-[10px]"
+                style={{ color: 'var(--text-muted)' }} title="Pinned messages">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a2 2 0 0 0-2-2h-6a2 2 0 0 0-2 2v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1v3.76z"/></svg>
+                <span className="hidden md:inline">Pinned</span>
+              </button>
+              <button id="tour-members" onClick={() => setShowMembers(!showMembers)}
+                className={`p-1.5 rounded-lg hover:opacity-80 flex items-center gap-1 text-[10px] ${currentTour?.highlight === 'members' ? 'ring-2 ring-purple-400' : ''} ${showMembers ? 'opacity-100' : ''}`}
+                style={{ color: showMembers ? 'var(--accent)' : 'var(--text-muted)', background: showMembers ? 'var(--accent-light)' : 'transparent' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                <span className="hidden md:inline">{DEMO_USERS.length}</span>
+              </button>
+            </div>
           </div>
-          <button id="tour-members" onClick={() => setShowMembers(!showMembers)}
-            className={`p-1.5 rounded-lg hover:opacity-80 ${currentTour?.highlight === 'members' ? 'ring-2 ring-purple-400' : ''}`}
-            style={{ color: 'var(--text-muted)' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-          </button>
+          {/* Bottom row: channel description */}
+          <div className="pb-2 -mt-1">
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              {channel.description}
+            </p>
+          </div>
         </div>
 
         <div className="flex-1 flex min-h-0">
