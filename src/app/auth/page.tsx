@@ -99,6 +99,17 @@ export default function AuthPage() {
             </button>
           </div>
         </div>
+
+        {/* Demo button */}
+        <button onClick={() => router.push('/demo')}
+          className="w-full mt-4 py-3 rounded-2xl text-sm font-semibold border-2 border-dashed transition-all hover:scale-[1.02] active:scale-[0.98] hover:border-solid group"
+          style={{ borderColor: 'var(--accent)', color: 'var(--accent)', background: 'transparent' }}>
+          <span className="group-hover:animate-wiggle inline-block mr-2">🎮</span>
+          Try interactive demo — no signup needed
+        </button>
+        <p className="text-center text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>
+          Send messages, use slash commands, see real-time features in action
+        </p>
       </div>
     </div>
   );
