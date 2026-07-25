@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { useConfetti, ConfettiCanvas } from '@/components/Confetti';
 
 type Channel = { id: string; name: string; description: string | null; type: string; emoji: string; created_by: string | null; is_default: boolean };
 type Profile = { id: string; display_name: string; avatar_color: string; status: string; email: string };
@@ -39,6 +40,9 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { particles, celebrate } = useConfetti();
+  const [emojiRain, setEmojiRain] = useState<{ id: number; emoji: string; left: number; duration: number }[]>([]);
+  const [partyMode, setPartyMode] = useState(false);
 
   useEffect(() => { if (!loading && !user) router.replace('/auth'); }, [user, loading, router]);
 
@@ -125,7 +129,64 @@ export default function ChatPage() {
     const body = input.trim();
     setInput('');
     await supabase.from('typing_indicators').delete().eq('channel_id', activeChannel.id).eq('user_id', user.id);
+
+    // Slash commands
+    if (body === '/confetti' || body === '/celebrate') {
+      celebrate('confetti');
+      await supabase.from('messages').insert({ channel_id: activeChannel.id, author_id: user.id, body: '🎉🎊 Let\'s celebrate! 🎊🎉' });
+      return;
+    }
+    if (body === '/firework' || body === '/fireworks') {
+      celebrate('firework');
+      await supabase.from('messages').insert({ channel_id: activeChannel.id, author_id: user.id, body: '🎆✨ Fireworks! ✨🎆' });
+      return;
+    }
+    if (body === '/party') {
+      setPartyMode(true);
+      celebrate('confetti');
+      triggerEmojiRain('🎉');
+      await supabase.from('messages').insert({ channel_id: activeChannel.id, author_id: user.id, body: '🥳🪩 PARTY MODE ACTIVATED 🪩🥳' });
+      setTimeout(() => setPartyMode(false), 10000);
+      return;
+    }
+    if (body === '/rain') {
+      triggerEmojiRain('🌧️');
+      await supabase.from('messages').insert({ channel_id: activeChannel.id, author_id: user.id, body: '🌧️ Making it rain! 🌧️' });
+      return;
+    }
+    if (body === '/hearts') {
+      triggerEmojiRain('❤️');
+      await supabase.from('messages').insert({ channel_id: activeChannel.id, author_id: user.id, body: '❤️💕 Sending love! 💕❤️' });
+      return;
+    }
+    if (body === '/rockets') {
+      triggerEmojiRain('🚀');
+      celebrate('firework');
+      await supabase.from('messages').insert({ channel_id: activeChannel.id, author_id: user.id, body: '🚀🚀🚀 TO THE MOON! 🚀🚀🚀' });
+      return;
+    }
+    if (body === '/help' || body === '/commands') {
+      await supabase.from('messages').insert({ channel_id: activeChannel.id, author_id: user.id, body: '✨ Fun commands: /confetti · /fireworks · /party · /rain · /hearts · /rockets' });
+      return;
+    }
+
+    // Auto-celebrate on milestone words
+    if (body.toLowerCase().includes('shipped') || body.toLowerCase().includes('launched') || body.toLowerCase().includes('merged')) {
+      celebrate('confetti');
+    }
+
     await supabase.from('messages').insert({ channel_id: activeChannel.id, author_id: user.id, body });
+  }
+
+  function triggerEmojiRain(emoji: string) {
+    const drops = Array.from({ length: 25 }, (_, i) => ({
+      id: Date.now() + i,
+      emoji,
+      left: Math.random() * 100,
+      duration: 2 + Math.random() * 3,
+    }));
+    setEmojiRain(drops);
+    setTimeout(() => setEmojiRain([]), 5000);
   }
 
   async function sendThreadReply(e: React.FormEvent) {
@@ -180,7 +241,16 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="h-screen flex overflow-hidden" style={{ background: 'var(--bg)' }}>
+    <div className={`h-screen flex overflow-hidden ${partyMode ? 'party-border border-2' : ''}`} style={{ background: 'var(--bg)' }}>
+      {/* Confetti overlay */}
+      <ConfettiCanvas particles={particles} />
+
+      {/* Emoji rain */}
+      {emojiRain.map(drop => (
+        <div key={drop.id} className="emoji-rain" style={{ left: `${drop.left}%`, animationDuration: `${drop.duration}s` }}>
+          {drop.emoji}
+        </div>
+      ))}
       {/* Mobile sidebar toggle */}
       <button onClick={() => setShowMobileSidebar(!showMobileSidebar)}
         className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-xl" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
@@ -292,11 +362,14 @@ export default function ChatPage() {
                     if (r.user_id === user.id) reactionCounts[r.emoji].mine = true;
                   });
 
+                  const isSpecial = msg.body.includes('🎉') || msg.body.includes('🚀') || msg.body.includes('🎊') || msg.body.includes('🥳');
+                  const isCommand = msg.body.includes('✨ Fun commands');
+
                   return (
-                    <div key={msg.id} className={`group flex gap-2 ${showAvatar ? 'mt-4' : 'mt-0.5'} animate-fadeIn`}
+                    <div key={msg.id} className={`group flex gap-2 ${showAvatar ? 'mt-4' : 'mt-0.5'} animate-fadeIn msg-hover rounded-lg px-1 -mx-1`}
                       onMouseEnter={() => setHoveredMsg(msg.id)} onMouseLeave={() => setHoveredMsg(null)}>
                       {showAvatar ? (
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 mt-0.5"
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 mt-0.5 ${isSpecial ? 'animate-wiggle' : ''}`}
                           style={{ background: msg.profiles?.avatar_color || 'var(--accent)' }}>
                           {msg.profiles?.display_name?.[0]?.toUpperCase() || '?'}
                         </div>
@@ -305,7 +378,7 @@ export default function ChatPage() {
                       <div className="flex-1 min-w-0">
                         {showAvatar && (
                           <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-xs font-semibold" style={{ color: msg.profiles?.avatar_color || 'var(--accent)' }}>
+                            <span className={`text-xs font-semibold ${partyMode ? 'animate-rainbow' : ''}`} style={{ color: msg.profiles?.avatar_color || 'var(--accent)' }}>
                               {msg.profiles?.display_name}
                             </span>
                             <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
@@ -313,7 +386,12 @@ export default function ChatPage() {
                             </span>
                           </div>
                         )}
-                        <p className="text-sm leading-relaxed break-words" style={{ color: 'var(--text-primary)' }}>
+                        <p className={`text-sm leading-relaxed break-words ${isSpecial ? 'animate-pop-in' : ''} ${isCommand ? 'text-xs rounded-lg px-3 py-2' : ''}`}
+                          style={{
+                            color: 'var(--text-primary)',
+                            ...(isSpecial ? { fontSize: '1.1em' } : {}),
+                            ...(isCommand ? { background: 'var(--bg-input)', color: 'var(--text-secondary)' } : {}),
+                          }}>
                           {msg.body}
                         </p>
 
@@ -338,8 +416,8 @@ export default function ChatPage() {
                         {hoveredMsg === msg.id && (
                           <div className="flex items-center gap-0.5 mt-1 animate-fadeIn">
                             {QUICK_REACTIONS.map(emoji => (
-                              <button key={emoji} onClick={() => toggleReaction(msg.id, emoji)}
-                                className="text-sm p-1 rounded hover:scale-125 transition-transform">{emoji}</button>
+                              <button key={emoji} onClick={() => { toggleReaction(msg.id, emoji); if (emoji === '🎉') celebrate('confetti'); }}
+                                className="text-sm p-1 rounded hover:scale-125 active:scale-90 transition-transform reaction-btn">{emoji}</button>
                             ))}
                             <button onClick={() => openThread(msg)}
                               className="text-[10px] px-2 py-1 rounded-lg border ml-1 hover:opacity-80"
@@ -380,8 +458,8 @@ export default function ChatPage() {
               <div className="flex gap-2">
                 <input type="text" value={input}
                   onChange={(e) => { setInput(e.target.value); handleTyping(); }}
-                  placeholder={`Message #${activeChannel?.name || 'channel'}...`}
-                  className="flex-1 px-4 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-purple-500/30"
+                  placeholder={input.startsWith('/') ? 'Try: /confetti /fireworks /party /hearts /rockets' : `Message #${activeChannel?.name || 'channel'}...`}
+                  className={`flex-1 px-4 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-purple-500/30 ${partyMode ? 'party-border' : ''}`}
                   style={{ background: 'var(--bg-input)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
                 <button type="submit" disabled={!input.trim()}
                   className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-30 hover:scale-105 active:scale-95 transition-transform"
@@ -389,6 +467,9 @@ export default function ChatPage() {
                   Send
                 </button>
               </div>
+              <p className="text-[9px] mt-1 px-1" style={{ color: 'var(--text-muted)' }}>
+                Type / for fun commands · Auto-confetti on "shipped" "launched" "merged"
+              </p>
             </form>
           </div>
 
