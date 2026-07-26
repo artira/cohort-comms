@@ -60,7 +60,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user) return;
     supabase.from('channels').select('*').order('created_at').then(({ data }) => {
-      if (data) { setChannels(data); if (!activeChannel) setActiveChannel(data[0]); }
+      if (data) { setChannels(data); if (!activeChannel) { setActiveChannel(data[0]); setView('channel'); } }
     });
     supabase.from('profiles').select('*').then(({ data }) => { if (data) setMembers(data); });
   }, [user]);
@@ -347,7 +347,7 @@ export default function ChatPage() {
                   {type === 'chat' ? 'Channels' : type === 'announcement' ? 'Announcements' : 'Threads'}
                 </p>
                 {chs.map(ch => (
-                  <button key={ch.id} onClick={() => { setActiveChannel(ch); setShowMobileSidebar(false); setThreadParent(null); }}
+                  <button key={ch.id} onClick={() => switchToChannel(ch)}
                     className="w-full text-left px-2 py-1.5 rounded-lg text-sm flex items-center gap-2 transition-colors"
                     style={{
                       background: activeChannel?.id === ch.id ? 'var(--accent-light)' : 'transparent',
